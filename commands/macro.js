@@ -32,7 +32,9 @@ module.exports = {
                 let macroData = JSON.parse(data) || {};
                 console.log(data)
                 // Add the new macro to the object
-                macroData.push({...store});
+                for (const [key, value] of store) {
+                    macroData[key] = value;
+                }
                 console.log(macroData)
                 // Write the updated object back to the file
                 await fs.promises.writeFile('D:/discordbot/macros.json', JSON.stringify(macroData));
@@ -42,8 +44,9 @@ module.exports = {
             }
         }
 
+        console.log(store.size)
         // save to the json
-        await saveMacros(store);
+        await saveMacros(global.store);
         console.log(store.size)
         //confirm
         await interaction.followUp(`Macro created.`);

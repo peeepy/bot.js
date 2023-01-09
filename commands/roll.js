@@ -13,64 +13,61 @@ module.exports = {
     async execute(interaction) {
         const command = interaction.options.getString('command');
 
-        // Extract the number of dice and die size from the command
-        const numDice = command.startsWith('d') ? 1 : parseInt(command.split('d')[0]);
-        const dieSize = parseInt(command.split('d')[1]);
-        let modifier = 0;
-        if (command.includes('+')) {
-            const [, mod] = command.split('+');
-            modifier = parseInt(mod);
-        }
+// Initialize the roll results array and the final total
+        const rollResults = [];
+        let ftotal = 0;
 
-        // Generate an array of random rolls using the 'numDice' and 'dieSize' values - modifier isn't added to this
-        async function rollCommand(numDice, dieSize, modifier) {
-            // Roll the dice
-            const resRolls = Array.apply(null, {length: numDice}).map(() => {
-                return Math.floor(Math.random() * dieSize - 1) + 1;
+// Split the command into individual rolls
+        const rolls = command.split('+');
+
+// Process each roll
+        for (const roll of rolls) {
+            // Initialize the variables for this roll
+            let numDice = 1;
+            let dieSize = 0;
+            let modifier = 0;
+
+            if (roll.includes('d')) {
+                // The roll is in the form "XdY" or "dY"
+                numDice = roll.startsWith('d') ? 1 : parseInt(roll.split('d')[0]);
+                dieSize = parseInt(roll.split('d')[1]);
+            } else {
+                // The roll is in the form "+Z"
+                modifier = parseInt(roll);
+            }
+
+            // Generate an array of random rolls using the 'numDice' and 'dieSize' values
+            let resRolls = Array.apply(null, {length: numDice}).map(() => {
+                return Math.ceil(Math.random() * dieSize) + modifier;
             });
 
-            // check if '-s' is present to return separate modifier totals
-            const separateModifiers = command.includes('-s');
-
-            // defining message as an empty string to add value to it
-            let message = '';
-            // defining the total of the rolls
-            const total = resRolls.reduce((acc, cur) => acc + cur) + modifier;
-            if (separateModifiers) {
-                // Add the modifier to each individual roll
-                const modifiedRolls = resRolls.map(x => x + modifier);
-                message = codeBlock('js,'`${modifiedRolls.join(", ")}\n(Rolls: ${resRolls})`);
-            } else {
-                // Check if there's a modifier provided, and if so, add it to the total
-                message = `${total}\n(Rolls: ${resRolls.join(", ")})`;
-                if (modifier) {
-                    message += ` + ${modifier}`;
-                }
-            }
-
-            // keep highest number
-            const highest = Math.max(...resRolls)
-            const keeph = command.includes('kh');
-
-            //keep lowest number
-            const lowest = Math.min(...resRolls)
-            const keepl = command.includes('kl');
-
-            // if keeph was added to the end of the command, append the highest roll to the message
-            if (keeph) {
-                message += `\n(Highest: ${highest})`;
-            }
-
-            //if keepl was added to the command, append the lowest roll to the message
-            if (keepl) {
-                message += `\n(Lowest: ${lowest})`;
-            }
-
-            //if not, it should default back to the previous message
-            await interaction.deferReply();
-            await interaction.followUp(codeBlock('js', `${message}`));
+            // Add the roll result to the array
+            rollResults.push({roll: resRolls});
+            console.log(rollResults)
         }
 
-        module.exports = {rollCommand}
+        // Calculate the total of all the rolls
+        ftotal = rollResults.reduce((acc, cur) => {
+            if (cur.roll) {
+                return acc + cur.roll.reduce((acc, cur) => acc + cur, 0);
+            } else {
+                return acc + cur;
+            }
+        }, 0);
+
+        let message = '';
+        for (const result of rollResults) {
+            message += `[${result.roll.join(", ")}]`;
+            message += ' ';
+        }
+
+        message = `\u001b[2;35m${ftotal}\u001b[0m\nRolls: ${message}(${command})`;
+
+        if (message.length > 2000) {
+            await interaction.reply('Error: The output cannot be more than 2,000 characters. Please try splitting up your rolls.')
+        }
+        //if not, it should default back to the previous message
+        await interaction.reply(codeBlock('ansi', `${message}`));
     }
-};
+}
+

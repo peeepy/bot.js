@@ -1,11 +1,9 @@
 const {SlashCommandBuilder, codeBlock} = require(`discord.js`)
-const {rollCommand} = require(`./roll.js`)
 const fs = require('fs')
 
 module.exports = {
-    rollCommand,
     data: new SlashCommandBuilder()
-        .setName('c')
+        .setName('cm')
         .setDescription(`Execute any previously created macros.`)
         .addStringOption(option =>
             option.setName(`macro`)
@@ -13,47 +11,71 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        await interaction.deferReply();
-
-        async function getTaskForMacro(macro) {
+        const macro = interaction.options.getString('macro')
+        async function getTaskForMacro() {
             try {
                 // Read the file containing the macros
                 const data = await fs.promises.readFile('D:/discordbot/macros.json', 'utf8');
                 // Parse the JSON data
                 const macroData = JSON.parse(data);
-                // Extract the task for the specified macro from the object
-                const {[macro]: task} = macroData;
-                return task;
+                const keys = Object.keys(macroData);
+                if (keys.includes(macro)) {
+                    return macroData[macro];
+                } else {
+                    await interaction.deferReply()
+                    await interaction.followUp(`Macro not found.`);
+                }
             } catch (error) {
                 console.error(error);
-                await interaction.reply(`Macro not found.`);
             }
         }
 
-        // Usage example
-        const task = await getTaskForMacro(macro);
+        const task = await getTaskForMacro();
 
-        // Split the task string on the ',' character to separate multiple tasks
-        const rolls = task.split(`,`);
+        const rollResults = [];
+        let ftotal = 0;
 
-        // Iterate over the array of rolls and execute each one
+// Split the command into individual rolls
+        const rolls = task.split(',');
+
         for (const roll of rolls) {
-            // Extract the number of dice and die size from the command
-            const numDice = roll.startsWith('d') ? 1 : parseInt(roll.split('d')[0]);
-            const diceSize = parseInt(roll.split('d')[1]);
+            // Initialize the variables for this roll
+            let numDice = 1;
+            let dieSize = 0;
             let modifier = 0;
-            if (roll.includes('+')) {
-                const [, mod] = roll.split('+');
-                modifier = parseInt(mod);
+
+            if (roll.includes('d')) {
+                // The roll is in the form "XdY" or "dY"
+                numDice = roll.startsWith('d') ? 1 : parseInt(roll.split('d')[0]);
+                dieSize = parseInt(roll.split('d')[1]);
+            } else {
+                // The roll is in the form "+Z"
+                modifier = parseInt(roll);
             }
 
-            // Execute the rollCommand function with the extracted values
-            const results = rollCommand(numDice, diceSize, modifier);
+            // Generate an array of random rolls using the 'numDice' and 'dieSize' values
+            const resRolls = Array.apply(null, {length: numDice}).map(() => {
+                return Math.ceil(Math.random() * dieSize) + modifier;
+            });
 
-            // Get the message from the results object
-            const message = results.message;
-
-            await interaction.followUp(codeBlock('js', `${message}`));
+            // Add the roll result to the array
+            rollResults.push({roll: resRolls});
         }
-    }
-};
+        // Calculate the total of all the rolls
+        ftotal = rollResults.reduce((acc, cur) => {
+            if (cur.roll) {
+                return acc + cur.roll.reduce((acc, cur) => acc + cur, 0);
+            } else {
+                return acc + cur;
+            }
+        }, 0);
+
+        let message = '';
+        for (const result of rollResults) {
+            message += `[${result.roll.join(", ")}]`;
+            message += ' ';
+        }
+        message = `\u001b[2;35m${ftotal}\u001b[0m\nRolls: ${message}(${macro})`;
+        await interaction.deferReply()
+        await interaction.followUp(codeBlock('ansi', `${message}`));
+    }}
