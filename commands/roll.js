@@ -1,4 +1,4 @@
-const {codeBlock, SlashCommandBuilder} = require('discord.js');
+const {codeBlock, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -61,7 +61,7 @@ module.exports = {
             message += ' ';
         }
 
-        message = `\u001b[2;35m${ftotal}\u001b[0m\nRolls: ${message}(${command})`;
+        message = `\u001b[2;36m${ftotal}\u001b[0m\nRolls: ${command} ${message}`;
 
         if (message.length > 2000) {
             await interaction.reply('Error: The output cannot be more than 2,000 characters. Please try splitting up your rolls.')
